@@ -667,7 +667,26 @@ class Job(MSONable):
             hosts=self.hosts,
             name=self.name,
         )
-        store.update(data, key=["uuid", "index"], save=save)
+
+        # store.update(data, key=["uuid", "index"], save=save)
+
+        import time
+        from pymongo.errors import AutoReconnect
+        def update_with_retry(store, data, key=["uuid", "index"], save=False, retries=3, delay=20):
+            attempt = 0
+            while attempt < retries:
+                try:
+                    store.update(data, key=key, save=save)
+                    return
+                except AutoReconnect as e:
+                    print(f"AutoReconnect error occurred: {e}. Retrying in {delay} seconds...")
+                    time.sleep(delay)
+                    attempt += 1
+                    
+            raise Exception("Max retry attempts reached. Store update failed.")
+        
+        update_with_retry(store, data, key=["uuid", "index"], save=save)
+
 
         CURRENT_JOB.reset()
         logger.info(f"Finished job - {self.name} ({self.uuid}{index_str})")
